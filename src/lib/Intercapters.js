@@ -6,7 +6,7 @@ import toast from "react-hot-toast";
 const baseURL =
   process.env.NODE_ENV === "development"
     ? "http://localhost:5000/api"
-    : "https://notebook-server.vercel.app/api";
+    : "http://localhost:5000/api";
 
 const axiosInstance = axios.create({
   baseURL,
@@ -17,15 +17,20 @@ const axiosInstance = axios.create({
 
 axiosInstance.interceptors.request.use(
   (config) => {
-    const accessToken = JSON.parse(localStorage.getItem("accessToken"));
-    if (accessToken) {
-      config.headers.Authorization = `Bearer ${accessToken}`;
+    const accessToken = localStorage.getItem("accessToken");
+    if (accessToken && accessToken !== "undefined") {
+      try {
+        const parsedToken = JSON.parse(accessToken);
+        JSON;
+        config.headers.Authorization = `Bearer ${parsedToken}`;
+      } catch (error) {
+        console.error("Invalid token format:", error);
+        config.headers.Authorization = `Bearer ${accessToken}`;
+      }
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
 axiosInstance.interceptors.response.use(

@@ -1,15 +1,34 @@
-import React from "react";
-import { Separator } from "../ui/separator";
+"use client";
 
-const Dashboard = () => {
+import React, { useEffect, useRef } from "react";
+import Link from "next/link";
+import { Canvas } from "fabric"; // Correct import
+
+const Dashboard = ({ notebooks }) => {
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-      <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-        <div className="aspect-video rounded-xl bg-muted/50">
-          <Separator orientation="vertical" className="mr-2 h-4" />
+    <>
+      {notebooks && (
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+          <div className="grid auto-rows-min gap-4 md:grid-cols-5">
+            {notebooks.map((notebook) => (
+              <NotebookCard key={notebook._id} notebook={notebook} />
+            ))}
+          </div>
         </div>
-      </div>
-    </div>
+      )}
+    </>
+  );
+};
+
+const NotebookCard = ({ notebook }) => {
+  return (
+    <Link
+      href={`/dashboard/edit/${notebook.type}/${notebook._id}`}
+      className="relative aspect-video rounded-xl flex justify-center cursor-pointer select-none items-center border shadow-md hover:shadow-lg transition"
+    >
+      <h1 className="text-sm">{notebook.title || notebook.type}</h1>
+      <div className="absolute inset-0" />
+    </Link>
   );
 };
 

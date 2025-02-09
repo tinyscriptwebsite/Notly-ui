@@ -25,18 +25,18 @@ const Login = () => {
     formState: { errors },
   } = useForm({ resolver: zodResolver(loginSchema) });
 
-  const onSubmit = async (data) => {
+  const onSubmit = async (formdata) => {
     try {
-      const res = await login(data);
-      if (res.success) {
+      const { data } = await login(formdata);
+      if (data.success) {
         toast.success("Login successfull");
+        localStorage.setItem("accessToken", JSON.stringify(data.data.accessToken));
         router.push("/dashboard");
       } else {
-        toast.error(res.message);
+        toast.error(data.message);
       }
     } catch (err) {
-      console.log(err);
-      toast.error(err.res?.message || "Login failed.");
+      toast.error(err.data?.message || "Login failed.");
     }
   };
   return (

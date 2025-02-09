@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
@@ -17,14 +18,24 @@ import toast from "react-hot-toast";
 import { ModeToggle } from "@/components/ui/mode";
 import Link from "next/link";
 import { Canvas, PencilBrush, Circle as FCircle, Textbox, Rect } from "fabric";
+import { useTheme } from "next-themes";
+import { saveNotebook } from "@/utils/api";
+import { Input } from "@/components/ui/input";
+import { useRouter } from "next/navigation";
 
 const Page = () => {
   const canvasRef = useRef(null);
+  const router = useRouter();
+  const { theme } = useTheme();
   const [canvas, setCanvas] = useState(null);
+  const [title, setTitle] = useState("untitled");
   const [tool, setTool] = useState("pen");
   const [color, setColor] = useState("#000000");
 
   useEffect(() => {
+    if (theme === "dark") {
+      setColor(theme === "dark" ? "#ffffff" : "#000000");
+    }
     if (!canvasRef.current) return;
     const newCanvas = new Canvas(canvasRef.current, {
       isDrawingMode: true,
@@ -33,10 +44,15 @@ const Page = () => {
     newCanvas.setWidth(window.innerWidth - 100);
     newCanvas.setHeight(window.innerHeight - 100);
     newCanvas.freeDrawingBrush = new PencilBrush(newCanvas);
-    newCanvas.freeDrawingBrush.color = "#000000";
+    newCanvas.freeDrawingBrush.color = color;
     newCanvas.freeDrawingBrush.width = 3;
     newCanvas.renderAll();
     setCanvas(newCanvas);
+
+    return () => {
+      newCanvas.dispose();
+      setCanvas(null);
+    };
   }, []);
 
   useEffect(() => {
@@ -91,6 +107,7 @@ const Page = () => {
       selectable: true,
       evented: true,
     });
+    setTool("Selection");
     canvas.add(rect);
     canvas.setActiveObject(rect);
   };
@@ -107,6 +124,7 @@ const Page = () => {
       selectable: true,
       evented: true,
     });
+    setTool("Selection");
     canvas.add(circle);
     canvas.setActiveObject(circle);
   };
@@ -123,19 +141,53 @@ const Page = () => {
       selectable: true,
       evented: true,
     });
+    setTool("Selection");
     canvas.add(text);
     canvas.setActiveObject(text);
   };
 
   const clearCanvas = () => {
     if (!canvas) return;
-    canvas.clear();
+
+    canvas.isDrawingMode = true;
+    const brush = new PencilBrush(canvas);
+
+    brush.color = "rgba(0,0,0,0)"; // Fully transparent brush
+    brush.width = 20; // Adjust eraser size
+
+    brush.onMouseUp = function () {
+      const objects = canvas.getObjects();
+      objects.forEach((obj) => {
+        if (
+          obj.type === "path" &&
+          obj.intersectsWithObject(canvas.getActiveObject())
+        ) {
+          canvas.remove(obj); // Remove only the intersecting object
+        }
+      });
+      canvas.renderAll();
+    };
+
+    canvas.freeDrawingBrush = brush;
   };
 
-  const saveSketch = () => {
-    if (!canvas) return;
-    localStorage.setItem("sketch", JSON.stringify(canvas.toJSON()));
-    toast.success("Sketch saved!");
+  const saveSketch = async () => {
+    try {
+      if (!canvas) return;
+      const { data } = await saveNotebook({
+        type: "sketch",
+        title: title,
+        content: canvas.toJSON(),
+      });
+      if (data.success) {
+        toast.success("Sketch saved!");
+        router.push("/dashboard");
+      } else {
+        toast.error(data.message);
+      }
+    } catch (error) {
+      toast.error(error.message);
+    }
   };
 
   const downloadSketch = () => {
@@ -199,10 +251,13 @@ const Page = () => {
             <Type />
           </Button>
           <Button
-            variant="outline"
+            variant={tool === "eraser" ? "default" : "outline"}
             size="icon"
-            title="Clear All"
-            onClick={clearCanvas}
+            title="Erase"
+            onClick={() => {
+              setTool("eraser");
+              clearCanvas();
+            }}
           >
             <Eraser />
           </Button>
@@ -227,14 +282,20 @@ const Page = () => {
           <ModeToggle />
         </div>
       </div>
-      <div className="flex items-center gap-4">
-        <label className="text-sm font-semibold">Color:</label>
-        <input
-          type="color"
-          value={color}
-          onChange={(e) => setColor(e.target.value)}
-          className="w-10 h-10 rounded-lg border-none"
-        />
+      <div className="flex justify-around items-center w-full">
+        <div className="flex items-center gap-4">
+          <label className="text-sm font-semibold">Title:</label>
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+        </div>
+        <div className="flex items-center gap-4">
+          <label className="text-sm font-semibold">Color:</label>
+          <input
+            type="color"
+            value={color}
+            onChange={(e) => setColor(e.target.value)}
+            className="w-10 h-10 rounded-lg border-none"
+          />
+        </div>
       </div>
       <div className="grid place-items-center">
         <canvas
