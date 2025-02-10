@@ -3,6 +3,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { jsPDF } from "jspdf";
 import {
   ArrowLeft,
   Circle,
@@ -22,6 +23,13 @@ import { useTheme } from "next-themes";
 import { saveNotebook } from "@/utils/api";
 import { Input } from "@/components/ui/input";
 import { useRouter } from "next/navigation";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@radix-ui/react-dropdown-menu";
 
 const Page = () => {
   const canvasRef = useRef(null);
