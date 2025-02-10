@@ -192,7 +192,7 @@ const Page = () => {
 
   const downloadSketch = () => {
     const dataURL = canvas.toDataURL({
-      format: "png",
+      format: "pdf",
       quality: 1.0,
     });
 
