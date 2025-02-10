@@ -378,7 +378,6 @@ const Page = () => {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-
           <Button
             variant="destructive"
             size="icon"

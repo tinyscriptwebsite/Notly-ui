@@ -190,15 +190,29 @@ const Page = () => {
     }
   };
 
-  const downloadSketch = () => {
-    const dataURL = canvas.toDataURL({
-      format: "pdf",
-      quality: 1.0,
-    });
+  const downloadSketch = (type) => {
+    if (!canvas) return;
 
     const link = document.createElement("a");
-    link.href = dataURL;
-    link.download = "sketch.png";
+    if (type === "png") {
+      const dataURL = canvas.toDataURL({
+        format: "pdf",
+        quality: 1.0,
+      });
+      link.href = dataURL;
+      link.download = "sketch.png";
+    } else {
+      const pdf = new jsPDF("landscape", "mm", "a4");
+      const canvasDataURL = canvas.toDataURL("image/png");
+
+      const imgWidth = 297;
+      const imgHeight = (canvas.height / canvas.width) * imgWidth;
+
+      pdf.addImage(canvasDataURL, "PNG", 10, 10, imgWidth - 20, imgHeight);
+
+      pdf.save("sketch.pdf"); // Download PDF file
+    }
+
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -269,14 +283,33 @@ const Page = () => {
           >
             <Save />
           </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            title="Download"
-            onClick={downloadSketch}
-          >
-            <Download />
-          </Button>
+          <div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant={"outline"} size="icon" title="Download">
+                  <Download />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+              >
+                <DropdownMenuItem
+                  onClick={() => downloadSketch("png")}
+                  className="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&>svg]:size-4 [&>svg]:shrink-0"
+                >
+                  PNG
+                </DropdownMenuItem>
+                <DropdownMenuSeparator></DropdownMenuSeparator>
+                <DropdownMenuItem
+                  onClick={() => downloadSketch("pdf")}
+                  className="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&>svg]:size-4 [&>svg]:shrink-0"
+                >
+                  PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
         <div>
           <ModeToggle />
