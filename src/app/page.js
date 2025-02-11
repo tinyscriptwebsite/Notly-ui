@@ -1,6 +1,4 @@
 import Header from "@/components/custom/Header";
-import Image from "next/image";
-import heroImg from "@/assets/Home/Hero.svg";
 import { ModeToggle } from "@/components/ui/mode";
 
 export default function Home() {
