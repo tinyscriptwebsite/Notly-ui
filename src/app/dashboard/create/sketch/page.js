@@ -32,17 +32,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@radix-ui/react-dropdown-menu";
+import { useLoader } from "@/hooks/useLoader";
 
 const Page = () => {
+  // canvas ref and state
   const canvasRef = useRef(null);
-  const router = useRouter();
-  const { theme } = useTheme();
   const [canvas, setCanvas] = useState(null);
-  const [title, setTitle] = useState("untitled");
   const [tool, setTool] = useState("pen");
   const [color, setColor] = useState("#000000");
   const [history, setHistory] = useState([]);
   const [redoHistory, setRedoHistory] = useState([]);
+  const router = useRouter();
+  const { theme } = useTheme();
+  const [title, setTitle] = useState("untitled");
+  // loader hooks for manage loader
+  const { startLoading, stopLoading } = useLoader();
 
   const saveCanvasState = () => {
     if (!canvas) return;
@@ -52,14 +56,18 @@ const Page = () => {
   };
 
   useEffect(() => {
+    // set color of pen according to theme
     if (theme === "dark") {
       setColor(theme === "dark" ? "#ffffff" : "#000000");
     }
+
     if (!canvasRef.current) return;
+    // create new canvas
     const newCanvas = new Canvas(canvasRef.current, {
       isDrawingMode: true,
     });
 
+    // set canvas width, height and brush
     newCanvas.setWidth(window.innerWidth - 100);
     newCanvas.setHeight(window.innerHeight - 100);
     newCanvas.freeDrawingBrush = new PencilBrush(newCanvas);
@@ -67,6 +75,8 @@ const Page = () => {
     newCanvas.freeDrawingBrush.width = 3;
     newCanvas.renderAll();
     setCanvas(newCanvas);
+
+    // clean up the canvas when the component unmounts
     return () => {
       newCanvas.dispose();
       setCanvas(null);
@@ -76,6 +86,7 @@ const Page = () => {
   useEffect(() => {
     if (!canvas) return;
 
+    // manage pen and selection
     if (tool === "pen") {
       canvas.freeDrawingBrush = new PencilBrush(canvas);
       canvas.freeDrawingBrush.color = color;
@@ -91,11 +102,13 @@ const Page = () => {
   useEffect(() => {
     if (!canvas) return;
 
+    // Save the canvas state when a path is created
     const handlePathCreated = () => {
-      canvas.renderAll(); // Ensure the canvas is re-rendered immediately
-      saveCanvasState(); // Save the canvas state
+      canvas.renderAll();
+      saveCanvasState();
     };
 
+    // Listen for the path:created event
     canvas.on("path:created", handlePathCreated);
 
     // Cleanup the event listener when the component unmounts
@@ -107,55 +120,63 @@ const Page = () => {
   useEffect(() => {
     if (!canvas) return;
 
+    // Resize the canvas when the window is resized
     const resizeCanvas = () => {
       canvas.setWidth(window.innerWidth - 100);
       canvas.setHeight(window.innerHeight - 100);
       canvas.renderAll();
     };
 
+    // Listen for the window resize event
     window.addEventListener("resize", resizeCanvas);
     resizeCanvas();
 
+    // Cleanup the event listener when the component unmounts
     return () => window.removeEventListener("resize", resizeCanvas);
   }, [canvas]);
 
+  // add rectangles shape
   const addRectangle = useCallback(() => {
     if (!canvas) return;
     const rect = new Rect({
       left: 100,
       top: 100,
-      fill: color,
-      stroke: "black",
-      strokeWidth: 2,
+      stroke: color,
+      fill: "transparent",
+      strokeWidth: 3,
       width: 100,
       height: 100,
       selectable: true,
       evented: true,
     });
+
+    // set active object and change tool
     setTool("Selection");
     canvas.add(rect);
     canvas.setActiveObject(rect);
-    saveCanvasState();
   }, [canvas, color]);
 
+  // add circle shape
   const addCircle = useCallback(() => {
     if (!canvas) return;
     const circle = new FCircle({
       left: 100,
       top: 100,
-      fill: color,
-      stroke: "black",
-      strokeWidth: 2,
+      stroke: color,
+      fill: "transparent",
+      strokeWidth: 3,
       radius: 50,
       selectable: true,
       evented: true,
     });
+
+    // set active object and change tool
     setTool("Selection");
     canvas.add(circle);
     canvas.setActiveObject(circle);
-    saveCanvasState();
   }, [canvas, color]);
 
+  // add text
   const addText = useCallback(() => {
     if (!canvas) return;
     const text = new Textbox("Write here...", {
@@ -168,48 +189,61 @@ const Page = () => {
       selectable: true,
       evented: true,
     });
+
+    // set active object and change tool
     setTool("Selection");
     canvas.add(text);
     canvas.setActiveObject(text);
-    saveCanvasState();
   }, [canvas, color]);
 
+  // clear canvas and save
   const clearCanvas = useCallback(() => {
     if (!canvas) return;
     canvas.clear();
     saveCanvasState();
   }, [canvas]);
 
+  // save sketch in database
   const saveSketch = async () => {
     try {
+      startLoading();
       if (!canvas) return;
+      // saveNotebook api call using axios
       const { data } = await saveNotebook({
         type: "sketch",
         title: title,
         content: canvas.toJSON(),
       });
+      // handle response
       if (data.success) {
         toast.success("Sketch saved!");
         router.push("/dashboard");
       } else {
         toast.error(data.message);
       }
+      // handle error
     } catch (error) {
       toast.error(error.message);
+      // handle finally and stop loading
+    } finally {
+      stopLoading();
     }
   };
 
+  // download sketch as png or pdf
   const downloadSketch = (type) => {
     if (!canvas) return;
 
     const link = document.createElement("a");
+    // download as png
     if (type === "png") {
       const dataURL = canvas.toDataURL({
-        format: "pdf",
+        format: "png",
         quality: 1.0,
       });
       link.href = dataURL;
       link.download = "sketch.png";
+      // download as pdf
     } else {
       const pdf = new jsPDF("landscape", "mm", "a4");
       const canvasDataURL = canvas.toDataURL("image/png");
@@ -219,42 +253,57 @@ const Page = () => {
 
       pdf.addImage(canvasDataURL, "PNG", 10, 10, imgWidth - 20, imgHeight);
 
-      pdf.save("sketch.pdf"); // Download PDF file
+      pdf.save("sketch.pdf");
     }
-
+    // add link and click
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
+  // undo function for undo changes
   const undo = () => {
     if (history.length === 0 || !canvas) return;
-
-    const lastState = history[history.length - 1]; // Get last saved state
-    setHistory((prev) => prev.slice(0, -1)); // Remove last state from history
-    setRedoHistory((prev) => [lastState, ...prev]); // Push last state to redo stack
-
+    // get last state
+    const lastState = history[history.length - 1];
+    // remove last state
+    setHistory((prev) => prev.slice(0, -1));
+    // add last state to redo
+    setRedoHistory((prev) => [lastState, ...prev]);
+    // load last state
     if (history.length > 1) {
+      // load last state in canvas
       canvas.loadFromJSON(history[history.length - 2], () => {
-        canvas.renderAll();
+        setTimeout(() => {
+          // render canvas
+          canvas.renderAll();
+        }, 0);
       });
     } else {
+      // clear canvas
       canvas.clear();
+      setTimeout(() => {
+        // render canvas
+        canvas.renderAll();
+      }, 0);
     }
-    setTool(tool === "Selection" ? "pen" : "Selection");
   };
 
+  // redo function for redo changes
   const redo = () => {
     if (redoHistory.length === 0 || !canvas) return;
-
-    const nextState = redoHistory[0]; // Get last redo state
-    setRedoHistory((prev) => prev.slice(1)); // Remove from redo stack
-    setHistory((prev) => [...prev, nextState]); // Push to history stack
-
+    // get next state
+    const nextState = redoHistory[0];
+    // remove next state
+    setRedoHistory((prev) => prev.slice(1));
+    // add next state to history
+    setHistory((prev) => [...prev, nextState]);
+    // load next state
     canvas.loadFromJSON(nextState, () => {
-      canvas.renderAll();
+      setTimeout(() => {
+        canvas.renderAll();
+      }, 0);
     });
-    setTool(tool === "Selection" ? "pen" : "Selection");
   };
 
   return (

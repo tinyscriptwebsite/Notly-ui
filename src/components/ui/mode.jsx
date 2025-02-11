@@ -17,8 +17,10 @@ export function ModeToggle({ className, variant = "outline" }) {
 
   return (
     <div className={className}>
+      {/* Add dropdown menu from shadcn library*/}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
+          {/* Button for trigger the dropdown menu */}
           <Button variant={variant} size="icon">
             <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
             <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
@@ -26,6 +28,7 @@ export function ModeToggle({ className, variant = "outline" }) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          {/* setTheme function from next-themes */}
           <DropdownMenuItem onClick={() => setTheme("light")}>
             Light
           </DropdownMenuItem>

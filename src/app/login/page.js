@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
 import { useForm } from "react-hook-form";
@@ -15,28 +16,42 @@ import { Button } from "@/components/ui/button";
 import { loginSchema } from "@/utils/schema";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { ModeToggle } from "@/components/ui/mode";
+import { useLoader } from "@/hooks/useLoader";
+import { useEffect } from "react";
 
 const Login = () => {
   const router = useRouter();
+  const { startLoading, stopLoading } = useLoader();
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm({ resolver: zodResolver(loginSchema) });
 
+  useEffect(() => {
+    // Redirect to dashboard if user is already logged in
+    if (localStorage.getItem("accessToken")) return router.push("/dashboard");
+  }, []);
+
+  // onSubmit function for handle user login
   const onSubmit = async (formdata) => {
     try {
+      startLoading();
       const { data } = await login(formdata);
       if (data.success) {
         toast.success("Login successfull");
-        localStorage.setItem("accessToken", JSON.stringify(data.data.accessToken));
+        localStorage.setItem(
+          "accessToken",
+          JSON.stringify(data.data.accessToken)
+        );
         router.push("/dashboard");
       } else {
         toast.error(data.message);
       }
     } catch (err) {
-      toast.error(err.data?.message || "Login failed.");
+      toast.error(err.message);
+    } finally {
+      stopLoading();
     }
   };
   return (

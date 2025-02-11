@@ -39,6 +39,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@radix-ui/react-dropdown-menu";
+import { useLoader } from "@/hooks/useLoader";
 
 const Page = () => {
   const router = useRouter();
@@ -52,8 +53,10 @@ const Page = () => {
   const [color, setColor] = useState("#000000");
   const [history, setHistory] = useState([]);
   const [redoHistory, setRedoHistory] = useState([]);
+  const { startLoading, stopLoading } = useLoader();
 
   const saveCanvasState = () => {
+    // save canvas state for undo
     if (!canvas) return;
     const currentState = canvas.toJSON();
     setHistory((prevHistory) => [...prevHistory, currentState]);
@@ -67,23 +70,18 @@ const Page = () => {
   }, [theme]);
 
   useEffect(() => {
-    if (!canvasRef.current) {
-      console.log("Canvas Ref is not initialized");
-      return;
+    // set color of pen according to theme
+    if (theme === "dark") {
+      setColor(theme === "dark" ? "#ffffff" : "#000000");
     }
 
+    if (!canvasRef.current) return;
+    // create new canvas
     const newCanvas = new Canvas(canvasRef.current, {
       isDrawingMode: true,
     });
 
-    if (!newCanvas) {
-      console.error("Fabric canvas is not initialized properly.");
-      return;
-    }
-
-    canvasInstance.current = newCanvas;
     setCanvas(newCanvas);
-
     newCanvas.setWidth(window.innerWidth - 100);
     newCanvas.setHeight(window.innerHeight - 100);
     newCanvas.freeDrawingBrush = new PencilBrush(newCanvas);
@@ -92,45 +90,42 @@ const Page = () => {
     newCanvas.renderAll();
 
     fetchSketch(newCanvas);
-
+    // clean up the canvas when the component unmounts
     return () => {
-      console.log("Canvas is null");
-      if (newCanvas === null) {
-        return;
-      } else {
-        newCanvas.dispose();
-        canvasInstance.current = null;
-        setCanvas(null);
-      }
+      newCanvas.dispose();
+      setCanvas(null);
     };
   }, []);
 
   useEffect(() => {
     if (!canvas) return;
+
+    // manage pen and selection
     if (tool === "pen") {
-      canvas.isDrawingMode = true;
       canvas.freeDrawingBrush = new PencilBrush(canvas);
       canvas.freeDrawingBrush.color = color;
       canvas.freeDrawingBrush.width = 3;
+      canvas.isDrawingMode = true;
     } else {
       canvas.isDrawingMode = false;
-      canvas.forEachObject((obj) => (obj.selectable = true));
+      canvas.forEachObject((obj) => (obj.selectable = true)); // Enable selection
     }
     canvas.requestRenderAll();
-    return () => {
-      canvas.isDrawingMode = false;
-      canvas.forEachObject((obj) => (obj.selectable = false));
-    };
   }, [tool, color, canvas]);
 
   useEffect(() => {
     if (!canvas) return;
 
+    // Save the canvas state when a path is created
     const handlePathCreated = () => {
       canvas.renderAll();
       saveCanvasState();
     };
+
+    // Listen for the path:created event
     canvas.on("path:created", handlePathCreated);
+
+    // Cleanup the event listener when the component unmounts
     return () => {
       canvas.off("path:created", handlePathCreated);
     };
@@ -139,33 +134,46 @@ const Page = () => {
   useEffect(() => {
     if (!canvas) return;
 
+    // Resize the canvas when the window is resized
     const resizeCanvas = () => {
       canvas.setWidth(window.innerWidth - 100);
       canvas.setHeight(window.innerHeight - 100);
       canvas.renderAll();
     };
 
+    // Listen for the window resize event
     window.addEventListener("resize", resizeCanvas);
     resizeCanvas();
 
+    // Cleanup the event listener when the component unmounts
     return () => window.removeEventListener("resize", resizeCanvas);
   }, [canvas]);
 
+  // fetch sketch
   const fetchSketch = async (newCanvas) => {
     try {
+      startLoading();
       const { data } = await getNotebook(id);
+      // handle response
       if (data && data.data.content) {
         newCanvas.loadFromJSON(data.data.content, () => {
           newCanvas.renderAll();
+          // Save the initial canvas state after loading the data for the first time
         });
         setTool("Selection");
         setTitle(data.data.title);
       }
+      // handle error
     } catch (error) {
       console.error("Failed to load sketch:", error);
+      toast.error(error.message);
+    } finally {
+      // handle finally and stop loading
+      stopLoading();
     }
   };
 
+  // add rectangles shape
   const addRectangle = useCallback(() => {
     if (!canvas) return;
     const rect = new Rect({
@@ -179,34 +187,34 @@ const Page = () => {
       selectable: true,
       evented: true,
     });
+
+    // set active object and change tool
+    setTool("Selection");
     canvas.add(rect);
     canvas.setActiveObject(rect);
-    saveCanvasState();
-    canvas.on("object:modified", () => {
-      canvas.renderAll();
-    });
   }, [canvas, color]);
 
+  // add circle shape
   const addCircle = useCallback(() => {
     if (!canvas) return;
     const circle = new FCircle({
       left: 100,
       top: 100,
       stroke: color,
-      strokeWidth: 3,
       fill: "transparent",
+      strokeWidth: 3,
       radius: 50,
       selectable: true,
       evented: true,
     });
+
+    // set active object and change tool
+    setTool("Selection");
     canvas.add(circle);
     canvas.setActiveObject(circle);
-    saveCanvasState();
-    canvas.on("object:modified", () => {
-      canvas.renderAll();
-    });
   }, [canvas, color]);
 
+  // add text
   const addText = useCallback(() => {
     if (!canvas) return;
     const text = new Textbox("Write here...", {
@@ -219,22 +227,24 @@ const Page = () => {
       selectable: true,
       evented: true,
     });
+
+    // set active object and change tool
+    setTool("Selection");
     canvas.add(text);
     canvas.setActiveObject(text);
-    saveCanvasState();
-    canvas.on("object:modified", () => {
-      canvas.renderAll();
-    });
   }, [canvas, color]);
 
+  // clear canvas and save
   const clearCanvas = useCallback(() => {
     if (!canvas) return;
     canvas.clear();
     saveCanvasState();
   }, [canvas]);
 
+  // update sketch
   const saveSketch = async () => {
     try {
+      startLoading();
       if (!canvas) return;
       const { data } = await updateNotebook(id, {
         id: id,
@@ -250,20 +260,25 @@ const Page = () => {
       }
     } catch (error) {
       toast.error(error.message);
+    } finally {
+      stopLoading();
     }
   };
 
+  // download sketch as png or pdf
   const downloadSketch = (type) => {
     if (!canvas) return;
 
     const link = document.createElement("a");
+    // download as png
     if (type === "png") {
       const dataURL = canvas.toDataURL({
-        format: "pdf",
+        format: "png",
         quality: 1.0,
       });
       link.href = dataURL;
       link.download = "sketch.png";
+      // download as pdf
     } else {
       const pdf = new jsPDF("landscape", "mm", "a4");
       const canvasDataURL = canvas.toDataURL("image/png");
@@ -273,55 +288,73 @@ const Page = () => {
 
       pdf.addImage(canvasDataURL, "PNG", 10, 10, imgWidth - 20, imgHeight);
 
-      pdf.save("sketch.pdf"); // Download PDF file
+      pdf.save("sketch.pdf");
     }
-
+    // add link and click
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
+  // delete sketch
   const deleteSketch = async () => {
     try {
+      // delete sketch
       const { data } = await deleteNotebook(id);
+      // handle response
       if (data.success) {
         toast.success("Sketch deleted!");
         router.push("/dashboard");
       } else {
         toast.error(data.message);
       }
+      // handle error
     } catch (error) {
       toast.error(error.message);
     }
   };
 
+  // undo function for undo changes
   const undo = () => {
     if (history.length === 0 || !canvas) return;
-
-    const lastState = history[history.length - 1]; // Get last saved state
-    setHistory((prev) => prev.slice(0, -1)); // Remove last state from history
-    setRedoHistory((prev) => [lastState, ...prev]); // Push last state to redo stack
-
-    if (history.length > 1) {
-      canvas.loadFromJSON(history[history.length - 2], () => {
-        canvas.renderAll();
-      });
-    } else {
-      canvas.clear();
+    // get last state
+    const lastState = history[history.length - 1];
+    // remove last state
+    setHistory((prev) => prev.slice(0, -1));
+    // add last state to redo
+    setRedoHistory((prev) => [lastState, ...prev]);
+    // load last state
+    if (history.length > 0) {
+      // load last state in canvas
+      if (history.length >= 1) {
+        canvas.loadFromJSON(history[history.length - 2], () => {
+          setTimeout(() => {
+            // render canvas
+            canvas.renderAll();
+          }, 0);
+        });
+      }
     }
   };
 
+  // redo function for redo changes
   const redo = () => {
     if (redoHistory.length === 0 || !canvas) return;
-
-    const nextState = redoHistory[0]; // Get last redo state
-    setRedoHistory((prev) => prev.slice(1)); // Remove from redo stack
-    setHistory((prev) => [...prev, nextState]); // Push to history stack
-
+    // get next state
+    const nextState = redoHistory[0];
+    // remove next state
+    setRedoHistory((prev) => prev.slice(1));
+    // add next state to history
+    setHistory((prev) => [...prev, nextState]);
+    // load next state
     canvas.loadFromJSON(nextState, () => {
-      canvas.renderAll();
+      setTimeout(() => {
+        canvas.renderAll();
+      }, 0);
     });
   };
+
+  console.log(history);
 
   return (
     <div className="grid place-items-center gap-4 py-4">

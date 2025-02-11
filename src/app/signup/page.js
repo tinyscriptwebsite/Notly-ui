@@ -5,7 +5,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -15,23 +14,35 @@ import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signupSchema } from "@/utils/schema";
 import Link from "next/link";
+import toast from "react-hot-toast";
+import { useLoader } from "@/hooks/useLoader";
 
 const Signup = () => {
   const router = useRouter();
+  const { startLoading, stopLoading } = useLoader();
+
+  // FORM
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm({ resolver: zodResolver(signupSchema) });
-  const onSubmit = async (data) => {
+
+  // onSubmit function for handle user registration
+  const onSubmit = async (formData) => {
     try {
-      const res = await signup(data);
-      alert("Signup successful!");
+      startLoading();
+      const { data } = await signup(formData);
+      if (data.success) toast.success("Signup successful!");
+      else return toast.error(response.message);
       router.push("/login");
     } catch (err) {
-      alert(err.response?.data?.message || "Signup failed.");
+      toast.error(err.message);
+    } finally {
+      stopLoading();
     }
   };
+
   return (
     <div className="flex justify-center items-center flex-col min-h-screen lg:px-[8.5rem] md:px-[6.5rem] sm:px-[3.5rem] px-[2.5rem] ">
       <Card className="w-[30%]">

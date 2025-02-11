@@ -3,7 +3,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import SpaceWrapper from "@/components/custom/SpaceWrapper";
 import { Toaster } from "react-hot-toast";
-import { ModeToggle } from "@/components/ui/mode";
+import { LoaderProvider } from "@/hooks/useLoader";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -26,11 +26,17 @@ export default function RootLayout({ children }) {
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        {/* Theme provider for changes in theme */}
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <SpaceWrapper>
-            <Toaster />
-            {children}
-          </SpaceWrapper>
+          {/* Loader provider for changes in loader */}
+          <LoaderProvider>
+            {/* Space wrapper for manage space in page */}
+            <SpaceWrapper>
+              {/* Toaster for show messages */}
+              <Toaster />
+              {children}
+            </SpaceWrapper>
+          </LoaderProvider>
         </ThemeProvider>
       </body>
     </html>
