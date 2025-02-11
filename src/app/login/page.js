@@ -56,7 +56,7 @@ const Login = () => {
   };
   return (
     <div className="flex justify-center flex-col items-center min-h-screen lg:px-[8.5rem] md:px-[6.5rem] sm:px-[3.5rem] px-[2.5rem] ">
-      <Card className="w-[30%]">
+      <Card className="md:w-[30%]">
         <CardHeader>
           <CardTitle>Login</CardTitle>
           <CardDescription>Welcom back to Notely</CardDescription>

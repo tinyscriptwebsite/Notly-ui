@@ -44,7 +44,6 @@ import { useLoader } from "@/hooks/useLoader";
 const Page = () => {
   const router = useRouter();
   const canvasRef = useRef(null);
-  const canvasInstance = useRef(null);
   const [title, setTitle] = useState("untitled");
   const { theme } = useTheme();
   const { id } = useParams();
@@ -52,15 +51,38 @@ const Page = () => {
   const [tool, setTool] = useState("pen");
   const [color, setColor] = useState("#000000");
   const [history, setHistory] = useState([]);
+  const [isInitialState, setIsInitialState] = useState(true);
   const [redoHistory, setRedoHistory] = useState([]);
   const { startLoading, stopLoading } = useLoader();
 
   const saveCanvasState = () => {
-    // save canvas state for undo
     if (!canvas) return;
+
     const currentState = canvas.toJSON();
-    setHistory((prevHistory) => [...prevHistory, currentState]);
+    // set history state
+    setHistory((prevHistory) => {
+      const newHistory = [...prevHistory, currentState];
+
+      // If it's the initial state and history was empty before, add initial state for do not lose the initial state
+      if (isInitialState && prevHistory.length === 0) {
+        // Remove the last object and create the initial state
+        const initialCanvasState = {
+          version: currentState.version,
+          objects: currentState.objects.slice(0, -1),
+        };
+
+        return [initialCanvasState, ...newHistory];
+      }
+
+      return newHistory;
+    });
+
     setRedoHistory([]);
+
+    // state updates are async
+    if (isInitialState && history.length === 0) {
+      setIsInitialState(false);
+    }
   };
 
   useEffect(() => {
@@ -158,7 +180,6 @@ const Page = () => {
       if (data && data.data.content) {
         newCanvas.loadFromJSON(data.data.content, () => {
           newCanvas.renderAll();
-          // Save the initial canvas state after loading the data for the first time
         });
         setTool("Selection");
         setTitle(data.data.title);
@@ -354,19 +375,17 @@ const Page = () => {
     });
   };
 
-  console.log(history);
-
   return (
     <div className="grid place-items-center gap-4 py-4">
-      <div className={`flex justify-between w-full px-20`}>
-        <div>
-          <Link href="/dashboard">
-            <Button variant="">
-              <ArrowLeft /> Back
-            </Button>
-          </Link>
-        </div>
-        <div className="flex gap-4">
+      <div
+        className={`flex justify-between items-center flex-wrap gap-4 w-full md:px-20 px-8`}
+      >
+        <Link href="/dashboard" className="md:w-fit w-full">
+          <Button variant="" className="md:w-fit w-full">
+            <ArrowLeft /> Back
+          </Button>
+        </Link>
+        <div className="flex gap-4 md:justify-normal justify-center flex-wrap">
           <Button
             variant={tool === "pen" ? "default" : "outline"}
             size="icon"
@@ -457,11 +476,11 @@ const Page = () => {
             <Trash />
           </Button>
         </div>
-        <div>
+        <div className="w-fit md:mx-0 mx-auto">
           <ModeToggle />
         </div>
       </div>
-      <div className="flex justify-around items-center w-full">
+      <div className="flex justify-around gap-4 flex-wrap items-center w-full">
         <div>
           <div className="flex gap-4">
             <Button
@@ -469,7 +488,7 @@ const Page = () => {
               size="icon"
               title="Undo"
               onClick={undo}
-              disabled={history.length === 0}
+              disabled={history.length === 1 || history.length === 0}
             >
               <Undo />
             </Button>

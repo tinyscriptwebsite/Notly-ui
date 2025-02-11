@@ -1,8 +1,5 @@
-"use client";
-
-import React, { useEffect, useRef } from "react";
+import React from "react";
 import Link from "next/link";
-import { Canvas } from "fabric"; // Correct import
 
 const Dashboard = ({ notebooks }) => {
   return (

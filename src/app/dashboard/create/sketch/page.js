@@ -308,15 +308,16 @@ const Page = () => {
 
   return (
     <div className="grid place-items-center gap-4 py-4">
-      <div className={`flex justify-between w-full px-20`}>
-        <div>
-          <Link href="/dashboard">
-            <Button variant="">
-              <ArrowLeft /> Back
-            </Button>
-          </Link>
-        </div>
-        <div className="flex gap-4">
+      <div
+        className={`flex justify-between items-center flex-wrap gap-4 w-full md:px-20 px-8`}
+      >
+        <Link href="/dashboard" className="md:w-fit w-full">
+          <Button className="md:w-auto w-full">
+            <ArrowLeft /> Back
+          </Button>
+        </Link>
+
+        <div className="flex gap-4 md:justify-normal justify-center flex-wrap">
           <Button
             variant={tool === "pen" ? "default" : "outline"}
             size="icon"
@@ -399,11 +400,11 @@ const Page = () => {
             </DropdownMenu>
           </div>
         </div>
-        <div>
+        <div className="w-fit md:mx-0 mx-auto">
           <ModeToggle />
         </div>
       </div>
-      <div className="flex justify-around items-center w-full">
+      <div className="flex justify-around gap-4 flex-wrap items-center w-full">
         <div>
           <div className="flex gap-4">
             <Button
