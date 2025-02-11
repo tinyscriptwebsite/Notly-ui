@@ -3,6 +3,6 @@
         "node_modules{,/**}",
         ".vscode{,/**}"
     ],
-    "appService.defaultWebAppToDeploy": "/subscriptions/b3414079-0f34-456e-8e2e-65eff361166e/resourceGroups/USAResourceGroup/providers/Microsoft.Web/sites/notlyfrontendtest",
-    "appService.deploySubpath": "build\\standalone"
+    "appService.showBuildDuringDeployPrompt": false,
+    "appService.defaultWebAppToDeploy": "None"
 }
