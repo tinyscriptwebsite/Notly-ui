@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { jsPDF } from "jspdf";
 import {
@@ -11,9 +11,11 @@ import {
   Eraser,
   Grab,
   Pen,
+  Redo,
   Save,
   Square,
   Type,
+  Undo,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { ModeToggle } from "@/components/ui/mode";
@@ -39,6 +41,15 @@ const Page = () => {
   const [title, setTitle] = useState("untitled");
   const [tool, setTool] = useState("pen");
   const [color, setColor] = useState("#000000");
+  const [history, setHistory] = useState([]);
+  const [redoHistory, setRedoHistory] = useState([]);
+
+  const saveCanvasState = () => {
+    if (!canvas) return;
+    const currentState = canvas.toJSON();
+    setHistory((prevHistory) => [...prevHistory, currentState]);
+    setRedoHistory([]); // Clear redo history when a new action is performed
+  };
 
   useEffect(() => {
     if (theme === "dark") {
@@ -56,7 +67,6 @@ const Page = () => {
     newCanvas.freeDrawingBrush.width = 3;
     newCanvas.renderAll();
     setCanvas(newCanvas);
-
     return () => {
       newCanvas.dispose();
       setCanvas(null);
@@ -67,24 +77,31 @@ const Page = () => {
     if (!canvas) return;
 
     if (tool === "pen") {
-      canvas.isDrawingMode = true;
       canvas.freeDrawingBrush = new PencilBrush(canvas);
       canvas.freeDrawingBrush.color = color;
       canvas.freeDrawingBrush.width = 3;
+      canvas.isDrawingMode = true;
     } else {
       canvas.isDrawingMode = false;
       canvas.forEachObject((obj) => (obj.selectable = true)); // Enable selection
     }
-
     canvas.requestRenderAll();
   }, [tool, color, canvas]);
 
   useEffect(() => {
     if (!canvas) return;
 
-    canvas.on("path:created", () => {
-      canvas.renderAll();
-    });
+    const handlePathCreated = () => {
+      canvas.renderAll(); // Ensure the canvas is re-rendered immediately
+      saveCanvasState(); // Save the canvas state
+    };
+
+    canvas.on("path:created", handlePathCreated);
+
+    // Cleanup the event listener when the component unmounts
+    return () => {
+      canvas.off("path:created", handlePathCreated);
+    };
   }, [canvas]);
 
   useEffect(() => {
@@ -102,7 +119,7 @@ const Page = () => {
     return () => window.removeEventListener("resize", resizeCanvas);
   }, [canvas]);
 
-  const addRectangle = () => {
+  const addRectangle = useCallback(() => {
     if (!canvas) return;
     const rect = new Rect({
       left: 100,
@@ -118,9 +135,10 @@ const Page = () => {
     setTool("Selection");
     canvas.add(rect);
     canvas.setActiveObject(rect);
-  };
+    saveCanvasState();
+  }, [canvas, color]);
 
-  const addCircle = () => {
+  const addCircle = useCallback(() => {
     if (!canvas) return;
     const circle = new FCircle({
       left: 100,
@@ -135,9 +153,10 @@ const Page = () => {
     setTool("Selection");
     canvas.add(circle);
     canvas.setActiveObject(circle);
-  };
+    saveCanvasState();
+  }, [canvas, color]);
 
-  const addText = () => {
+  const addText = useCallback(() => {
     if (!canvas) return;
     const text = new Textbox("Write here...", {
       left: 50,
@@ -152,32 +171,14 @@ const Page = () => {
     setTool("Selection");
     canvas.add(text);
     canvas.setActiveObject(text);
-  };
+    saveCanvasState();
+  }, [canvas, color]);
 
-  const clearCanvas = () => {
+  const clearCanvas = useCallback(() => {
     if (!canvas) return;
-
-    canvas.isDrawingMode = true;
-    const brush = new PencilBrush(canvas);
-
-    brush.color = "rgba(0,0,0,0)"; // Fully transparent brush
-    brush.width = 20; // Adjust eraser size
-
-    brush.onMouseUp = function () {
-      const objects = canvas.getObjects();
-      objects.forEach((obj) => {
-        if (
-          obj.type === "path" &&
-          obj.intersectsWithObject(canvas.getActiveObject())
-        ) {
-          canvas.remove(obj); // Remove only the intersecting object
-        }
-      });
-      canvas.renderAll();
-    };
-
-    canvas.freeDrawingBrush = brush;
-  };
+    canvas.clear();
+    saveCanvasState();
+  }, [canvas]);
 
   const saveSketch = async () => {
     try {
@@ -224,6 +225,36 @@ const Page = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const undo = () => {
+    if (history.length === 0 || !canvas) return;
+
+    const lastState = history[history.length - 1]; // Get last saved state
+    setHistory((prev) => prev.slice(0, -1)); // Remove last state from history
+    setRedoHistory((prev) => [lastState, ...prev]); // Push last state to redo stack
+
+    if (history.length > 1) {
+      canvas.loadFromJSON(history[history.length - 2], () => {
+        canvas.renderAll();
+      });
+    } else {
+      canvas.clear();
+    }
+    setTool(tool === "Selection" ? "pen" : "Selection");
+  };
+
+  const redo = () => {
+    if (redoHistory.length === 0 || !canvas) return;
+
+    const nextState = redoHistory[0]; // Get last redo state
+    setRedoHistory((prev) => prev.slice(1)); // Remove from redo stack
+    setHistory((prev) => [...prev, nextState]); // Push to history stack
+
+    canvas.loadFromJSON(nextState, () => {
+      canvas.renderAll();
+    });
+    setTool(tool === "Selection" ? "pen" : "Selection");
   };
 
   return (
@@ -324,6 +355,28 @@ const Page = () => {
         </div>
       </div>
       <div className="flex justify-around items-center w-full">
+        <div>
+          <div className="flex gap-4">
+            <Button
+              variant="outline"
+              size="icon"
+              title="Undo"
+              onClick={undo}
+              disabled={history.length === 0}
+            >
+              <Undo />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              title="Redo"
+              onClick={redo}
+              disabled={redoHistory.length === 0}
+            >
+              <Redo />
+            </Button>
+          </div>
+        </div>
         <div className="flex items-center gap-4">
           <label className="text-sm font-semibold">Title:</label>
           <Input value={title} onChange={(e) => setTitle(e.target.value)} />

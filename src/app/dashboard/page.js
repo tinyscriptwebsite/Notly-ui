@@ -15,7 +15,6 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import WithAuth from "@/components/custom/Auth";
 
 function Page() {
   const router = useRouter();
@@ -58,4 +57,4 @@ function Page() {
   );
 }
 
-export default WithAuth(Page);
+export default Page;

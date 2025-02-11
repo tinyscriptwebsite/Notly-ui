@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { jsPDF } from "jspdf";
 import {
@@ -11,10 +11,12 @@ import {
   Eraser,
   Grab,
   Pen,
+  Redo,
   Save,
   Square,
   Trash,
   Type,
+  Undo,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { ModeToggle } from "@/components/ui/mode";
@@ -43,12 +45,20 @@ const Page = () => {
   const canvasRef = useRef(null);
   const canvasInstance = useRef(null);
   const [title, setTitle] = useState("untitled");
-
   const { theme } = useTheme();
   const { id } = useParams();
   const [canvas, setCanvas] = useState(null);
   const [tool, setTool] = useState("pen");
   const [color, setColor] = useState("#000000");
+  const [history, setHistory] = useState([]);
+  const [redoHistory, setRedoHistory] = useState([]);
+
+  const saveCanvasState = () => {
+    if (!canvas) return;
+    const currentState = canvas.toJSON();
+    setHistory((prevHistory) => [...prevHistory, currentState]);
+    setRedoHistory([]);
+  };
 
   useEffect(() => {
     if (theme === "dark") {
@@ -97,7 +107,6 @@ const Page = () => {
 
   useEffect(() => {
     if (!canvas) return;
-
     if (tool === "pen") {
       canvas.isDrawingMode = true;
       canvas.freeDrawingBrush = new PencilBrush(canvas);
@@ -107,9 +116,7 @@ const Page = () => {
       canvas.isDrawingMode = false;
       canvas.forEachObject((obj) => (obj.selectable = true));
     }
-
     canvas.requestRenderAll();
-
     return () => {
       canvas.isDrawingMode = false;
       canvas.forEachObject((obj) => (obj.selectable = false));
@@ -119,12 +126,13 @@ const Page = () => {
   useEffect(() => {
     if (!canvas) return;
 
-    canvas.on("path:created", () => {
+    const handlePathCreated = () => {
       canvas.renderAll();
-    });
-
+      saveCanvasState();
+    };
+    canvas.on("path:created", handlePathCreated);
     return () => {
-      canvas.off("path:created");
+      canvas.off("path:created", handlePathCreated);
     };
   }, [canvas]);
 
@@ -158,7 +166,7 @@ const Page = () => {
     }
   };
 
-  const addRectangle = () => {
+  const addRectangle = useCallback(() => {
     if (!canvas) return;
     const rect = new Rect({
       left: 100,
@@ -173,13 +181,13 @@ const Page = () => {
     });
     canvas.add(rect);
     canvas.setActiveObject(rect);
-
+    saveCanvasState();
     canvas.on("object:modified", () => {
       canvas.renderAll();
     });
-  };
+  }, [canvas, color]);
 
-  const addCircle = () => {
+  const addCircle = useCallback(() => {
     if (!canvas) return;
     const circle = new FCircle({
       left: 100,
@@ -193,13 +201,13 @@ const Page = () => {
     });
     canvas.add(circle);
     canvas.setActiveObject(circle);
-
+    saveCanvasState();
     canvas.on("object:modified", () => {
       canvas.renderAll();
     });
-  };
+  }, [canvas, color]);
 
-  const addText = () => {
+  const addText = useCallback(() => {
     if (!canvas) return;
     const text = new Textbox("Write here...", {
       left: 50,
@@ -213,16 +221,17 @@ const Page = () => {
     });
     canvas.add(text);
     canvas.setActiveObject(text);
-
+    saveCanvasState();
     canvas.on("object:modified", () => {
       canvas.renderAll();
     });
-  };
+  }, [canvas, color]);
 
-  const clearCanvas = () => {
+  const clearCanvas = useCallback(() => {
     if (!canvas) return;
     canvas.clear();
-  };
+    saveCanvasState();
+  }, [canvas]);
 
   const saveSketch = async () => {
     try {
@@ -284,6 +293,34 @@ const Page = () => {
     } catch (error) {
       toast.error(error.message);
     }
+  };
+
+  const undo = () => {
+    if (history.length === 0 || !canvas) return;
+
+    const lastState = history[history.length - 1]; // Get last saved state
+    setHistory((prev) => prev.slice(0, -1)); // Remove last state from history
+    setRedoHistory((prev) => [lastState, ...prev]); // Push last state to redo stack
+
+    if (history.length > 1) {
+      canvas.loadFromJSON(history[history.length - 2], () => {
+        canvas.renderAll();
+      });
+    } else {
+      canvas.clear();
+    }
+  };
+
+  const redo = () => {
+    if (redoHistory.length === 0 || !canvas) return;
+
+    const nextState = redoHistory[0]; // Get last redo state
+    setRedoHistory((prev) => prev.slice(1)); // Remove from redo stack
+    setHistory((prev) => [...prev, nextState]); // Push to history stack
+
+    canvas.loadFromJSON(nextState, () => {
+      canvas.renderAll();
+    });
   };
 
   return (
@@ -392,6 +429,28 @@ const Page = () => {
         </div>
       </div>
       <div className="flex justify-around items-center w-full">
+        <div>
+          <div className="flex gap-4">
+            <Button
+              variant="outline"
+              size="icon"
+              title="Undo"
+              onClick={undo}
+              disabled={history.length === 0}
+            >
+              <Undo />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              title="Redo"
+              onClick={redo}
+              disabled={redoHistory.length === 0}
+            >
+              <Redo />
+            </Button>
+          </div>
+        </div>
         <div className="flex items-center gap-4">
           <label className="text-sm font-semibold">Title:</label>
           <Input value={title} onChange={(e) => setTitle(e.target.value)} />
