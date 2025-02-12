@@ -94,7 +94,8 @@ const Page = () => {
       canvas.isDrawingMode = true;
     } else {
       canvas.isDrawingMode = false;
-      canvas.forEachObject((obj) => (obj.selectable = true)); // Enable selection
+      // added selection for all objects that create by users
+      canvas.forEachObject((obj) => (obj.selectable = true));
     }
     canvas.requestRenderAll();
   }, [tool, color, canvas]);
@@ -127,7 +128,7 @@ const Page = () => {
       canvas.renderAll();
     };
 
-    // Listen for the window resize event
+    // Listen for the window resize event and resize canvas
     window.addEventListener("resize", resizeCanvas);
     resizeCanvas();
 
@@ -255,7 +256,7 @@ const Page = () => {
 
       pdf.save("sketch.pdf");
     }
-    // add link and click
+    // add link and click for download that file
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

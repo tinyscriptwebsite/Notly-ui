@@ -22,7 +22,7 @@ body {
   width: 90px;
   aspect-ratio: 2;
   animation: l10-0 1s linear infinite;
-}
+} 
 .loader:before,
 .loader:after {
   content: "";
